@@ -17,6 +17,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.offline.DownloadRequest
 import com.metrolist.innertube.YouTube
 import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.constants.AudioQualityKey
@@ -34,16 +35,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.time.LocalDateTime
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -60,11 +68,15 @@ constructor(
     private val TAG = "DownloadUtil"
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
-    private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+    private val downloadUpdateQueue = mutableListOf<Download>()
+    private val dbUpdateQueue = mutableListOf<Pair<String, LocalDateTime?>>()
+    private val pendingAddRequests = mutableListOf<DownloadRequest>()
+    private val mutex = Mutex()
 
     private val dataSourceFactory =
         ResolvingDataSource.Factory(
@@ -163,7 +175,7 @@ constructor(
             databaseProvider,
             downloadCache,
             dataSourceFactory,
-            Executor(Runnable::run)
+            Executors.newFixedThreadPool(4)
         ).apply {
             maxParallelDownloads = 3
             addListener(
@@ -173,23 +185,21 @@ constructor(
                         download: Download,
                         finalException: Exception?,
                     ) {
-                        downloads.update { map ->
-                            map.toMutableMap().apply {
-                                set(download.request.id, download)
-                            }
-                        }
-
                         scope.launch {
-                            when (download.state) {
-                                Download.STATE_COMPLETED -> {
-                                    database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
-                                }
-                                Download.STATE_FAILED,
-                                Download.STATE_STOPPED,
-                                Download.STATE_REMOVING -> {
-                                    database.updateDownloadedInfo(download.request.id, false, null)
-                                }
-                                else -> {
+                            mutex.withLock {
+                                downloadUpdateQueue.add(download)
+                                val downloadId = download.request.id
+                                when (download.state) {
+                                    Download.STATE_COMPLETED -> {
+                                        dbUpdateQueue.add(downloadId to LocalDateTime.now())
+                                    }
+                                    Download.STATE_FAILED,
+                                    Download.STATE_STOPPED,
+                                    Download.STATE_REMOVING -> {
+                                        dbUpdateQueue.add(downloadId to null)
+                                    }
+                                    else -> {
+                                    }
                                 }
                             }
                         }
@@ -200,18 +210,11 @@ constructor(
                         download: Download,
                     ) {
                         val downloadId = download.request.id
-
-                        runCatching {
-                            database.updateDownloadedInfo(downloadId, false, null)
-                        }.onSuccess {
-                            downloads.update { map ->
-                                map.toMutableMap().apply {
-                                    remove(downloadId)
-                                }
+                        scope.launch {
+                            mutex.withLock {
+                                dbUpdateQueue.add(downloadId to null)
                             }
-                            Timber.tag(TAG).d("Successfully removed download $downloadId from in-memory map")
-                        }.onFailure { error ->
-                            Timber.tag(TAG).e(error, "Failed to update database for removed download $downloadId, keeping in-memory entry")
+                            downloads.update { it - downloadId }
                         }
                     }
                 }
@@ -219,12 +222,72 @@ constructor(
         }
 
     init {
-        val result = mutableMapOf<String, Download>()
-        val cursor = downloadManager.downloadIndex.getDownloads()
-        while (cursor.moveToNext()) {
-            result[cursor.download.request.id] = cursor.download
+        scope.launch {
+            // Load initial state first
+            val result = mutableMapOf<String, Download>()
+            val cursor = downloadManager.downloadIndex.getDownloads()
+            while (cursor.moveToNext()) {
+                result[cursor.download.request.id] = cursor.download
+            }
+            downloads.value = result
+
+            launch {
+                while (true) {
+                    delay(500)
+                    val updates =
+                        mutex.withLock {
+                            if (downloadUpdateQueue.isEmpty()) null else ArrayList(downloadUpdateQueue).also { downloadUpdateQueue.clear() }
+                        }
+                    updates?.let { chunk ->
+                        downloads.update { it + chunk.associateBy { d -> d.request.id } }
+                    }
+                }
+            }
+
+            launch {
+                while (true) {
+                    delay(2000)
+                    val updates =
+                        mutex.withLock {
+                            if (dbUpdateQueue.isEmpty()) null else ArrayList(dbUpdateQueue).also { dbUpdateQueue.clear() }
+                        }
+                    updates?.let { chunk ->
+                        database.transaction {
+                            chunk.forEach { (songId, date) ->
+                                updateDownloadedInfo(songId, date != null, date)
+                            }
+                        }
+                    }
+                }
+            }
+
+            launch {
+                while (true) {
+                    // Relaxed throttling: 100 songs every 1 second
+                    delay(1000)
+                    val requestsToAdd =
+                        mutex.withLock {
+                            if (pendingAddRequests.isEmpty()) null
+                            else {
+                                val chunk = pendingAddRequests.take(100)
+                                pendingAddRequests.removeAll(chunk)
+                                chunk
+                            }
+                        }
+                    requestsToAdd?.forEach { request ->
+                        downloadManager.addDownload(request)
+                    }
+                }
+            }
         }
-        downloads.value = result
+    }
+
+    fun addDownloads(requests: List<DownloadRequest>) {
+        scope.launch {
+            mutex.withLock {
+                pendingAddRequests.addAll(requests)
+            }
+        }
     }
 
     fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }

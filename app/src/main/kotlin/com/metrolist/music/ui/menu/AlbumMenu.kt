@@ -93,6 +93,7 @@ import com.metrolist.music.utils.PlaylistExporter
 import com.metrolist.music.utils.getExportFileUri
 import com.metrolist.music.utils.saveToPublicDocuments
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 @SuppressLint("MutableCollectionMutableState")
@@ -129,21 +130,23 @@ fun AlbumMenu(
 
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.id]?.state == STATE_COMPLETED }) {
-                    STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.id]?.state == STATE_QUEUED ||
-                            downloads[it.id]?.state == STATE_DOWNLOADING ||
-                            downloads[it.id]?.state == STATE_COMPLETED
+        downloadUtil.downloads
+            .debounce(200)
+            .collect { downloads ->
+                downloadState =
+                    if (songs.all { downloads[it.id]?.state == STATE_COMPLETED }) {
+                        STATE_COMPLETED
+                    } else if (songs.all {
+                            downloads[it.id]?.state == STATE_QUEUED ||
+                                downloads[it.id]?.state == STATE_DOWNLOADING ||
+                                downloads[it.id]?.state == STATE_COMPLETED
+                        }
+                    ) {
+                        STATE_DOWNLOADING
+                    } else {
+                        STATE_STOPPED
                     }
-                ) {
-                    STATE_DOWNLOADING
-                } else {
-                    STATE_STOPPED
-                }
-        }
+            }
     }
 
     var refetchIconDegree by remember { mutableFloatStateOf(0f) }
@@ -543,20 +546,18 @@ fun AlbumMenu(
                                         )
                                     },
                                     onClick = {
-                                        songs.forEach { song ->
-                                            val downloadRequest =
-                                                DownloadRequest
-                                                    .Builder(song.id, song.id.toUri())
-                                                    .setCustomCacheKey(song.id)
-                                                    .setData(song.song.title.toByteArray())
-                                                    .build()
-                                            DownloadService.sendAddDownload(
-                                                context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
-                                                false,
-                                            )
+                                        val requests = songs.map { song ->
+                                            DownloadRequest
+                                                .Builder(song.id, song.id.toUri())
+                                                .setCustomCacheKey(song.id)
+                                                .setData(song.song.title.toByteArray())
+                                                .build()
                                         }
+                                        ExoDownloadService.sendAddDownloads(
+                                            context,
+                                            ArrayList(requests),
+                                            false,
+                                        )
                                     },
                                 )
                             }

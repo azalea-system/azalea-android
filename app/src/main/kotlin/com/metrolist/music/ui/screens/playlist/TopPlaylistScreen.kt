@@ -679,19 +679,19 @@ private fun TopPlaylistHeader(
                                         }
                                     }
                                     else -> {
-                                        songs.forEach { song ->
+                                        val requests = songs.map { song ->
                                             val downloadRequest = DownloadRequest
                                                 .Builder(song.id, song.id.toUri())
                                                 .setCustomCacheKey(song.id)
                                                 .setData(song.title.toByteArray())
                                                 .build()
-                                            DownloadService.sendAddDownload(
-                                                context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
-                                                false,
-                                            )
+                                            downloadRequest
                                         }
+                                        ExoDownloadService.sendAddDownloads(
+                                            context,
+                                            ArrayList(requests),
+                                            false,
+                                        )
                                     }
                                 }
                             },

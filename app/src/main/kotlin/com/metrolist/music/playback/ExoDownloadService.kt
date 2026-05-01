@@ -15,6 +15,7 @@ import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.scheduler.PlatformScheduler
 import androidx.media3.exoplayer.scheduler.Scheduler
@@ -35,9 +36,17 @@ class ExoDownloadService : DownloadService(
     lateinit var downloadUtil: DownloadUtil
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == REMOVE_ALL_PENDING_DOWNLOADS) {
-            downloadManager.currentDownloads.forEach { download ->
-                downloadManager.removeDownload(download.request.id)
+        when (intent?.action) {
+            REMOVE_ALL_PENDING_DOWNLOADS -> {
+                downloadManager.currentDownloads.forEach { download ->
+                    downloadManager.removeDownload(download.request.id)
+                }
+            }
+            ACTION_ADD_DOWNLOADS -> {
+                val requests = intent.getParcelableArrayListExtra<DownloadRequest>(EXTRA_DOWNLOAD_REQUESTS)
+                if (requests != null) {
+                    downloadUtil.addDownloads(requests)
+                }
             }
         }
         return super.onStartCommand(intent, flags, startId)
@@ -115,5 +124,27 @@ class ExoDownloadService : DownloadService(
         const val NOTIFICATION_ID = 1
         const val JOB_ID = 1
         const val REMOVE_ALL_PENDING_DOWNLOADS = "REMOVE_ALL_PENDING_DOWNLOADS"
+        const val ACTION_ADD_DOWNLOADS = "com.metrolist.music.playback.action.ADD_DOWNLOADS"
+        const val EXTRA_DOWNLOAD_REQUESTS = "requests"
+
+        fun sendAddDownloads(
+            context: Context,
+            requests: ArrayList<DownloadRequest>,
+            foreground: Boolean
+        ) {
+            // Chunk requests to avoid exceeding Intent size limits (approx 1MB)
+            // 500 requests per chunk is safe
+            requests.chunked(500).forEach { chunk ->
+                val intent = Intent(context, ExoDownloadService::class.java).apply {
+                    action = ACTION_ADD_DOWNLOADS
+                    putParcelableArrayListExtra(EXTRA_DOWNLOAD_REQUESTS, ArrayList(chunk))
+                }
+                if (foreground) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
+        }
     }
 }

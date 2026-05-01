@@ -600,19 +600,18 @@ private fun CachePlaylistHeader(
                             },
                             onDownload = {
                                 // Download all cached songs
-                                songs.forEach { song ->
-                                    val downloadRequest = DownloadRequest
+                                val requests = songs.map { song ->
+                                    DownloadRequest
                                         .Builder(song.song.id, song.song.id.toUri())
                                         .setCustomCacheKey(song.song.id)
                                         .setData(song.song.title.toByteArray())
                                         .build()
-                                    DownloadService.sendAddDownload(
-                                        context,
-                                        ExoDownloadService::class.java,
-                                        downloadRequest,
-                                        false,
-                                    )
                                 }
+                                ExoDownloadService.sendAddDownloads(
+                                    context,
+                                    ArrayList(requests),
+                                    false,
+                                )
                             },
                             onDismiss = { menuState.dismiss() }
                         )

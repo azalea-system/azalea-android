@@ -92,6 +92,7 @@ import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.saveToPublicDocuments
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -257,21 +258,23 @@ fun YouTubePlaylistMenu(
     }
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED ||
-                            downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                            downloads[it.id]?.state == Download.STATE_COMPLETED
+        downloadUtil.downloads
+            .debounce(200)
+            .collect { downloads ->
+                downloadState =
+                    if (songs.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
+                        Download.STATE_COMPLETED
+                    } else if (songs.all {
+                            downloads[it.id]?.state == Download.STATE_QUEUED ||
+                                downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
+                                downloads[it.id]?.state == Download.STATE_COMPLETED
+                        }
+                    ) {
+                        Download.STATE_DOWNLOADING
+                    } else {
+                        Download.STATE_STOPPED
                     }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+            }
     }
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
@@ -642,20 +645,18 @@ fun YouTubePlaylistMenu(
                                                 )
                                             },
                                             onClick = {
-                                                songs.forEach { song ->
-                                                    val downloadRequest =
-                                                        DownloadRequest
-                                                            .Builder(song.id, song.id.toUri())
-                                                            .setCustomCacheKey(song.id)
-                                                            .setData(song.title.toByteArray())
-                                                            .build()
-                                                    DownloadService.sendAddDownload(
-                                                        context,
-                                                        ExoDownloadService::class.java,
-                                                        downloadRequest,
-                                                        false,
-                                                    )
+                                                val requests = songs.map { song ->
+                                                    DownloadRequest
+                                                        .Builder(song.id, song.id.toUri())
+                                                        .setCustomCacheKey(song.id)
+                                                        .setData(song.title.toByteArray())
+                                                        .build()
                                                 }
+                                                ExoDownloadService.sendAddDownloads(
+                                                    context,
+                                                    ArrayList(requests),
+                                                    false,
+                                                )
                                             },
                                         )
                                     }

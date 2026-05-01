@@ -124,6 +124,7 @@ import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.AutoPlaylistViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -369,21 +370,23 @@ fun AutoPlaylistScreen(
             songs?.let { addAll(it) }
         }
         if (songs?.isEmpty() == true) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
-                    Download.STATE_COMPLETED
-                } else if (songs?.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                            downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                            downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    } == true
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+        downloadUtil.downloads
+            .debounce(200)
+            .collect { downloads ->
+                downloadState =
+                    if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
+                        Download.STATE_COMPLETED
+                    } else if (songs?.all {
+                            downloads[it.song.id]?.state == Download.STATE_QUEUED ||
+                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
+                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
+                        } == true
+                    ) {
+                        Download.STATE_DOWNLOADING
+                    } else {
+                        Download.STATE_STOPPED
+                    }
+            }
     }
 
     var showRemoveDownloadDialog by remember {
@@ -1016,20 +1019,18 @@ private fun AutoPlaylistHeader(
                                     }
 
                                     else -> {
-                                        songs.forEach { song ->
-                                            val downloadRequest =
-                                                DownloadRequest
-                                                    .Builder(song.song.id, song.song.id.toUri())
-                                                    .setCustomCacheKey(song.song.id)
-                                                    .setData(song.song.title.toByteArray())
-                                                    .build()
-                                            DownloadService.sendAddDownload(
-                                                context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
-                                                false,
-                                            )
+                                        val requests = songs.map { song ->
+                                            DownloadRequest
+                                                .Builder(song.song.id, song.song.id.toUri())
+                                                .setCustomCacheKey(song.song.id)
+                                                .setData(song.song.title.toByteArray())
+                                                .build()
                                         }
+                                        ExoDownloadService.sendAddDownloads(
+                                            context,
+                                            ArrayList(requests),
+                                            false,
+                                        )
                                     }
                                 }
                             },

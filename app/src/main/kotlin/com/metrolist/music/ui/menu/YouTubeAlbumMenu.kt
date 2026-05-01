@@ -80,6 +80,7 @@ import com.metrolist.music.ui.component.SongListItem
 import com.metrolist.music.ui.component.YouTubeListItem
 import com.metrolist.music.utils.reportException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,23 +123,24 @@ fun YouTubeAlbumMenu(
 
     LaunchedEffect(album) {
         val songs = album?.songs?.map { it.id } ?: return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it]?.state == Download.STATE_QUEUED ||
-                            downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                            downloads[it]?.state == Download.STATE_COMPLETED
+        downloadUtil.downloads
+            .debounce(200)
+            .collect { downloads ->
+                downloadState =
+                    if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
+                        Download.STATE_COMPLETED
+                    } else if (songs.all {
+                            downloads[it]?.state == Download.STATE_QUEUED ||
+                                downloads[it]?.state == Download.STATE_DOWNLOADING ||
+                                downloads[it]?.state == Download.STATE_COMPLETED
+                        }
+                    ) {
+                        Download.STATE_DOWNLOADING
+                    } else {
+                        Download.STATE_STOPPED
                     }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+            }
     }
-
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
     }
@@ -503,17 +505,17 @@ fun YouTubeAlbumMenu(
                                         )
                                     },
                                     onClick = {
-                                        album?.songs?.forEach { song ->
-                                            val downloadRequest =
-                                                DownloadRequest
-                                                    .Builder(song.id, song.id.toUri())
-                                                    .setCustomCacheKey(song.id)
-                                                    .setData(song.song.title.toByteArray())
-                                                    .build()
-                                            DownloadService.sendAddDownload(
+                                        val requests = album?.songs?.map { song ->
+                                            DownloadRequest
+                                                .Builder(song.id, song.id.toUri())
+                                                .setCustomCacheKey(song.id)
+                                                .setData(song.song.title.toByteArray())
+                                                .build()
+                                        }
+                                        if (requests != null) {
+                                            ExoDownloadService.sendAddDownloads(
                                                 context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
+                                                ArrayList(requests),
                                                 false,
                                             )
                                         }

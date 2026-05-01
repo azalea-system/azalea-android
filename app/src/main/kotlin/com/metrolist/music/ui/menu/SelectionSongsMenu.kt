@@ -561,20 +561,24 @@ fun SelectionSongMenu(
                                             )
                                         },
                                         onClick = {
-                                            songSelection.forEach { song ->
-                                                val downloadRequest =
-                                                    DownloadRequest
-                                                        .Builder(song.id, song.id.toUri())
-                                                        .setCustomCacheKey(song.id)
-                                                        .setData(song.song.title.toByteArray())
-                                                        .build()
-                                                DownloadService.sendAddDownload(
-                                                    context,
-                                                    ExoDownloadService::class.java,
-                                                    downloadRequest,
-                                                    false,
-                                                )
+                                            val requests = songSelection.map { song ->
+                                                DownloadRequest
+                                                    .Builder(song.id, song.id.toUri())
+                                                    .setCustomCacheKey(song.id)
+                                                    .setData(
+                                                        (
+                                                            (song as? Song)?.song?.title
+                                                                ?: (song as? com.metrolist.innertube.models.SongItem)?.title
+                                                                ?: ""
+                                                        ).toByteArray(),
+                                                    )
+                                                    .build()
                                             }
+                                            ExoDownloadService.sendAddDownloads(
+                                                context,
+                                                ArrayList(requests),
+                                                false,
+                                            )
                                         },
                                     )
                                 }
@@ -978,20 +982,18 @@ fun SelectionMediaMetadataMenu(
                                             )
                                         },
                                         onClick = {
-                                            songSelection.forEach { song ->
-                                                val downloadRequest =
-                                                    DownloadRequest
-                                                        .Builder(song.id, song.id.toUri())
-                                                        .setCustomCacheKey(song.id)
-                                                        .setData(song.title.toByteArray())
-                                                        .build()
-                                                DownloadService.sendAddDownload(
-                                                    context,
-                                                    ExoDownloadService::class.java,
-                                                    downloadRequest,
-                                                    false,
-                                                )
+                                            val requests = songSelection.map { song ->
+                                                DownloadRequest
+                                                    .Builder(song.id, song.id.toUri())
+                                                    .setCustomCacheKey(song.id)
+                                                    .setData(song.title.toByteArray())
+                                                    .build()
                                             }
+                                            ExoDownloadService.sendAddDownloads(
+                                                context,
+                                                ArrayList(requests),
+                                                false,
+                                            )
                                         },
                                     )
                                 }
