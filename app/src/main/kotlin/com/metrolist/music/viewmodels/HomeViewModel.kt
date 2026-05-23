@@ -30,6 +30,7 @@ import com.metrolist.music.constants.HideVideoSongsKey
 import com.metrolist.music.constants.HideYoutubeShortsKey
 import com.metrolist.music.constants.InnerTubeCookieKey
 import com.metrolist.music.constants.ShowWrappedCardKey
+import com.metrolist.music.constants.WrappedCompletedKey
 import com.metrolist.music.constants.WrappedSeenKey
 import com.metrolist.music.ui.screens.wrapped.WrappedViewModel
 import com.metrolist.music.constants.QuickPicks
@@ -251,7 +252,7 @@ class HomeViewModel @Inject constructor(
 
     val showWrappedCard: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
         val showPref = prefs[ShowWrappedCardKey] ?: true
-        val seen = prefs[WrappedSeenKey] ?: false
+        val completed = prefs[WrappedCompletedKey] ?: false
         val isBeforeCutoff = LocalDate.now().isBefore(
             LocalDate.of(
                 WrappedViewModel.CARD_CUTOFF_YEAR,
@@ -259,16 +260,14 @@ class HomeViewModel @Inject constructor(
                 WrappedViewModel.CARD_CUTOFF_DAY,
             ),
         )
-        isBeforeCutoff && (!seen || showPref)
+        (isBeforeCutoff && !completed) || showPref
     }.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
-    fun markWrappedAsSeen() {
-        viewModelScope.launch(Dispatchers.IO) {
-            context.dataStore.edit {
-                it[WrappedSeenKey] = true
-            }
-        }
-    }
+    val wrappedCardIsResume: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
+        val seen = prefs[WrappedSeenKey] ?: false
+        val completed = prefs[WrappedCompletedKey] ?: false
+        seen && !completed
+    }.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     fun togglePin(item: YTItem) {
         viewModelScope.launch(Dispatchers.IO) {

@@ -309,7 +309,7 @@ class WrappedViewModel @Inject constructor(
             }.timeInMillis
 
         const val CARD_CUTOFF_YEAR = 2026
-        const val CARD_CUTOFF_MONTH = 6
+        const val CARD_CUTOFF_MONTH = 7
         const val CARD_CUTOFF_DAY = 1
     }
 }

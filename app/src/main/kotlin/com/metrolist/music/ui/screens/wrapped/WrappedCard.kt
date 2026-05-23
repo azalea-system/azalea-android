@@ -33,6 +33,7 @@ import com.metrolist.music.ui.theme.bbhBartle
 @Composable
 fun WrappedCard(
     onOpen: () -> Unit,
+    isResume: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "gradient")
@@ -97,7 +98,8 @@ fun WrappedCard(
                     shape = RoundedCornerShape(50),
                 ) {
                     Text(
-                        text = stringResource(R.string.open),
+                        text = if (isResume) stringResource(R.string.wrapped_continue)
+                        else stringResource(R.string.open),
                         fontWeight = FontWeight.Bold,
                     )
                 }

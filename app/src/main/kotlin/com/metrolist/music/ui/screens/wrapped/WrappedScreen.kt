@@ -40,6 +40,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.metrolist.music.R
+import com.metrolist.music.constants.WrappedCompletedKey
+import com.metrolist.music.constants.WrappedLastPageKey
+import com.metrolist.music.constants.WrappedSeenKey
+import com.metrolist.music.utils.dataStore
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun WrappedScreen(
@@ -47,6 +53,7 @@ fun WrappedScreen(
     viewModel: WrappedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     DisposableEffect(Unit) {
         onDispose { viewModel.releaseAudio() }
@@ -74,7 +81,7 @@ fun WrappedScreen(
         }
     }
 
-    val window = (LocalContext.current as? Activity)?.window
+    val window = (context as? Activity)?.window
 
     DisposableEffect(window) {
         if (window != null) {
@@ -184,8 +191,30 @@ fun WrappedScreen(
                 pageCount = { 19 },
             )
 
+            LaunchedEffect(Unit) {
+                val currentPrefs = context.dataStore.data.first()
+                val wasSeen = currentPrefs[WrappedSeenKey] ?: false
+                val wasCompleted = currentPrefs[WrappedCompletedKey] ?: false
+
+                context.dataStore.edit { it[WrappedSeenKey] = true }
+
+                if (wasSeen && !wasCompleted) {
+                    val lastPage = currentPrefs[WrappedLastPageKey] ?: 0
+                    if (lastPage > 0) {
+                        pagerState.scrollToPage(lastPage)
+                    }
+                }
+            }
+
             LaunchedEffect(pagerState.currentPage) {
                 viewModel.onPageChanged(pagerState.currentPage)
+
+                context.dataStore.edit { prefs ->
+                    prefs[WrappedLastPageKey] = pagerState.currentPage
+                    if (pagerState.currentPage >= 18) {
+                        prefs[WrappedCompletedKey] = true
+                    }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
