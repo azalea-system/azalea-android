@@ -29,14 +29,14 @@ class WrappedViewModel @Inject constructor(
         _state.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val topSongsDeferred = async { databaseDao.mostPlayedSongsStats(fromTimeStamp, limit = 30, toTimeStamp = toTimeStamp).first() }
-                val topArtistsDeferred = async { databaseDao.mostPlayedArtists(fromTimeStamp, limit = 5, toTimeStamp = toTimeStamp).first() }
-                val topAlbumsDeferred = async { databaseDao.mostPlayedAlbums(fromTimeStamp, limit = 5, toTimeStamp = toTimeStamp).first() }
-                val uniqueSongCountDeferred = async { databaseDao.getUniqueSongCountInRange(fromTimeStamp, toTimeStamp).first() }
-                val uniqueArtistCountDeferred = async { databaseDao.getUniqueArtistCountInRange(fromTimeStamp, toTimeStamp).first() }
-                val uniqueAlbumCountDeferred = async { databaseDao.getUniqueAlbumCountInRange(fromTimeStamp, toTimeStamp).first() }
-                val totalPlayTimeMsDeferred = async { databaseDao.getTotalPlayTimeInRange(fromTimeStamp, toTimeStamp).first() ?: 0L }
+            try {
+                val topSongsDeferred = async(Dispatchers.IO) { databaseDao.mostPlayedSongsStats(fromTimeStamp, limit = 30, toTimeStamp = toTimeStamp).first() }
+                val topArtistsDeferred = async(Dispatchers.IO) { databaseDao.mostPlayedArtists(fromTimeStamp, limit = 5, toTimeStamp = toTimeStamp).first() }
+                val topAlbumsDeferred = async(Dispatchers.IO) { databaseDao.mostPlayedAlbums(fromTimeStamp, limit = 5, toTimeStamp = toTimeStamp).first() }
+                val uniqueSongCountDeferred = async(Dispatchers.IO) { databaseDao.getUniqueSongCountInRange(fromTimeStamp, toTimeStamp).first() }
+                val uniqueArtistCountDeferred = async(Dispatchers.IO) { databaseDao.getUniqueArtistCountInRange(fromTimeStamp, toTimeStamp).first() }
+                val uniqueAlbumCountDeferred = async(Dispatchers.IO) { databaseDao.getUniqueAlbumCountInRange(fromTimeStamp, toTimeStamp).first() }
+                val totalPlayTimeMsDeferred = async(Dispatchers.IO) { databaseDao.getTotalPlayTimeInRange(fromTimeStamp, toTimeStamp).first() ?: 0L }
 
                 val results = awaitAll(
                     topSongsDeferred,
@@ -48,24 +48,33 @@ class WrappedViewModel @Inject constructor(
                     totalPlayTimeMsDeferred,
                 )
 
-                @Suppress("UNCHECKED_CAST")
-                val topSongsResult = results[0] as List<com.metrolist.music.db.entities.SongWithStats>
-                @Suppress("UNCHECKED_CAST")
-                val topArtistsResult = results[1] as List<com.metrolist.music.db.entities.Artist>
-                @Suppress("UNCHECKED_CAST")
-                val topAlbumsResult = results[2] as List<com.metrolist.music.db.entities.Album>
+                withContext(Dispatchers.IO) {
+                    @Suppress("UNCHECKED_CAST")
+                    val topSongsResult = results[0] as List<com.metrolist.music.db.entities.SongWithStats>
+                    @Suppress("UNCHECKED_CAST")
+                    val topArtistsResult = results[1] as List<com.metrolist.music.db.entities.Artist>
+                    @Suppress("UNCHECKED_CAST")
+                    val topAlbumsResult = results[2] as List<com.metrolist.music.db.entities.Album>
 
+                    _state.update {
+                        it.copy(
+                            topSongs = topSongsResult,
+                            topArtists = topArtistsResult,
+                            topAlbums = topAlbumsResult,
+                            uniqueSongCount = results[3] as Int,
+                            uniqueArtistCount = results[4] as Int,
+                            uniqueAlbumCount = results[5] as Int,
+                            totalMinutes = (results[6] as Long) / 1000 / 60,
+                            isDataReady = true,
+                            isLoading = false,
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 _state.update {
                     it.copy(
-                        topSongs = topSongsResult,
-                        topArtists = topArtistsResult,
-                        topAlbums = topAlbumsResult,
-                        uniqueSongCount = results[3] as Int,
-                        uniqueArtistCount = results[4] as Int,
-                        uniqueAlbumCount = results[5] as Int,
-                        totalMinutes = (results[6] as Long) / 1000 / 60,
-                        isDataReady = true,
                         isLoading = false,
+                        error = e.message ?: "Unknown error",
                     )
                 }
             }
@@ -94,7 +103,7 @@ class WrappedViewModel @Inject constructor(
             }.timeInMillis
 
         const val CARD_CUTOFF_YEAR = 2026
-        const val CARD_CUTOFF_MONTH = 6 // June
+        const val CARD_CUTOFF_MONTH = 6
         const val CARD_CUTOFF_DAY = 1
     }
 }

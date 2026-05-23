@@ -140,6 +140,7 @@ import com.metrolist.music.ui.component.LocalBottomSheetPageState
 import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.NavigationTitle
 import com.metrolist.music.ui.component.RandomizeGridItem
+import com.metrolist.music.ui.screens.wrapped.WrappedCard
 import com.metrolist.music.ui.component.SongGridItem
 import com.metrolist.music.ui.component.SongListItem
 import com.metrolist.music.ui.component.SpeedDialGridItem
@@ -1354,34 +1355,13 @@ fun HomeScreen(
                 if (selectedChip == null) {
                     item(key = "wrapped_card") {
                         AnimatedVisibility(visible = shouldShowWrappedCard) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.wrapped_ready_title),
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.wrapped_ready_subtitle),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Button(onClick = {
-                                        viewModel.markWrappedAsSeen()
-                                        navController.navigate("wrapped")
-                                    }) {
-                                        Text(stringResource(R.string.open))
-                                    }
-                                }
-                            }
+                            WrappedCard(
+                                modifier = Modifier.padding(16.dp),
+                                onOpen = {
+                                    viewModel.markWrappedAsSeen()
+                                    navController.navigate("wrapped")
+                                },
+                            )
                         }
                     }
                 }

@@ -14,4 +14,5 @@ data class WrappedState(
     val uniqueAlbumCount: Int = 0,
     val isDataReady: Boolean = false,
     val isLoading: Boolean = false,
+    val error: String? = null,
 )

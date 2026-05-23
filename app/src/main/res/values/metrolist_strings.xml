@@ -454,6 +454,12 @@
     <string name="wrapped_half_year_title">Your Half-Year in Music</string>
     <string name="wrapped_ready_title">Your Half-Year Wrapped is ready!</string>
     <string name="wrapped_ready_subtitle">Relive your favorite songs, artists, and albums</string>
+    <string name="wrapped_loading">Loading your half-year wrapped…</string>
+    <string name="wrapped_error">Something went wrong loading your data</string>
+    <string name="wrapped_minutes_listened">%1$d minutes listened</string>
+    <string name="wrapped_unique_songs">%1$d unique songs</string>
+    <string name="wrapped_unique_artists">%1$d unique artists</string>
+    <string name="wrapped_back">Back</string>
 
     <!-- Equalizer UI -->
     <plurals name="profiles_count">

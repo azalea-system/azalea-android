@@ -31,6 +31,7 @@ import com.metrolist.music.constants.HideYoutubeShortsKey
 import com.metrolist.music.constants.InnerTubeCookieKey
 import com.metrolist.music.constants.ShowWrappedCardKey
 import com.metrolist.music.constants.WrappedSeenKey
+import com.metrolist.music.ui.screens.wrapped.WrappedViewModel
 import com.metrolist.music.constants.QuickPicks
 import com.metrolist.music.constants.QuickPicksKey
 import com.metrolist.music.db.MusicDatabase
@@ -251,7 +252,13 @@ class HomeViewModel @Inject constructor(
     val showWrappedCard: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
         val showPref = prefs[ShowWrappedCardKey] ?: true
         val seen = prefs[WrappedSeenKey] ?: false
-        val isBeforeCutoff = LocalDate.now().isBefore(LocalDate.of(2026, 6, 1))
+        val isBeforeCutoff = LocalDate.now().isBefore(
+            LocalDate.of(
+                WrappedViewModel.CARD_CUTOFF_YEAR,
+                WrappedViewModel.CARD_CUTOFF_MONTH,
+                WrappedViewModel.CARD_CUTOFF_DAY,
+            ),
+        )
         isBeforeCutoff && (!seen || showPref)
     }.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
