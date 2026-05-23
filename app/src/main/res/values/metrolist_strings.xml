@@ -460,6 +460,13 @@
     <string name="wrapped_unique_songs">%1$d unique songs</string>
     <string name="wrapped_unique_artists">%1$d unique artists</string>
     <string name="wrapped_back">Back</string>
+    <string name="wrapped_audio_loading">Preparing your Wrapped playlist…</string>
+    <string name="wrapped_audio_progress">%1$d of %2$d tracks loaded</string>
+    <string name="wrapped_audio_skip">Continue without music</string>
+    <string name="wrapped_audio_error">Could not load audio tracks</string>
+    <string name="wrapped_audio_retry">Retry</string>
+    <string name="wrapped_mute">Mute</string>
+    <string name="wrapped_unmute">Unmute</string>
 
     <!-- Equalizer UI -->
     <plurals name="profiles_count">

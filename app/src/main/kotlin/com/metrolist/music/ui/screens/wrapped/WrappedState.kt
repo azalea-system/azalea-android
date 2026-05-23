@@ -15,4 +15,10 @@ data class WrappedState(
     val isDataReady: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
+    val audioLoadingProgress: Int = 0,
+    val audioTotalTracks: Int = 0,
+    val isAudioReady: Boolean = false,
+    val isAudioLoading: Boolean = false,
+    val audioErrorMessage: String? = null,
+    val isMuted: Boolean = false,
 )
