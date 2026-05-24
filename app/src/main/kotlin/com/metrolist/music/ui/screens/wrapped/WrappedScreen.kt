@@ -223,8 +223,11 @@ fun WrappedScreen(
                     modifier = Modifier.fillMaxSize(),
                     beyondViewportPageCount = 1,
                 ) { page ->
+                    val pageOffset = (page - pagerState.currentPage).toFloat() + pagerState.currentPageOffsetFraction
                     when (page) {
-                        0 -> WrappedPage1Intro(state)
+                        0 -> WrappedWelcomeScreen(
+                            pageOffset = pageOffset,
+                        )
                         1 -> WrappedPage2GuessMinutes(state)
                         2 -> WrappedPage3MinutesReveal(state)
                         3 -> WrappedPage4ShareMinutes(state)

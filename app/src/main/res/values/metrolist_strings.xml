@@ -451,7 +451,8 @@
     <string name="karaoke">Karaoke</string>
     <string name="apple_music_style">Apple Music</string>
     <string name="album_art_for">Album art for %s</string>
-    <string name="wrapped_half_year_title">Your Half-Year in Music</string>
+    <string name="wrapped_welcome_title">WELCOME...</string>
+    <string name="wrapped_welcome_subtitle">Time to see what you\'ve been listening to during the first half of the year</string>
     <string name="wrapped_ready_title">Your Half-Year Wrapped is ready!</string>
     <string name="wrapped_ready_subtitle">Relive your favorite songs, artists, and albums</string>
     <string name="wrapped_loading">Loading your half-year wrapped…</string>

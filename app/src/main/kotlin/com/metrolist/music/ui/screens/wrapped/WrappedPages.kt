@@ -26,27 +26,6 @@ fun WrappedPageLayout(
 }
 
 @Composable
-fun WrappedPage1Intro(
-    state: WrappedState,
-) {
-    WrappedPageLayout {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Your Half-Year in Music",
-                style = MaterialTheme.typography.headlineMedium,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "January — May 2026",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
 fun WrappedPage2GuessMinutes(
     state: WrappedState,
 ) {
