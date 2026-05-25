@@ -35,36 +35,60 @@ suspend fun fetchExternalAsset(
     userAgent: String,
     superPropertiesBase64: String? = null,
 ): String? {
-    if (imageUrl.startsWith("mp:")) return imageUrl
-    val api = "https://discord.com/api/v9/applications/$applicationId/external-assets"
+    val TAG = "DiscordExtAssets"
     val imageId = imageUrl.takeLast(20)
+    Timber.tag(TAG).d("fetchExternalAsset: imageUrl ends with ...$imageId")
+
+    if (imageUrl.startsWith("mp:")) {
+        Timber.tag(TAG).d("fetchExternalAsset: imageUrl already mp:, returning as-is")
+        return imageUrl
+    }
+
+    val api = "https://discord.com/api/v9/applications/$applicationId/external-assets"
     val startTime = System.currentTimeMillis()
-    Timber.tag("ExtAssets").d("Uploading external asset: ...$imageId")
-    
+    Timber.tag(TAG).d("Posting to $api for ...$imageId")
+
     return withContext(NonCancellable) {
         try {
-            val body = Json.encodeToString(ExternalAssetRequest(urls = listOf(imageUrl)))
+            val requestBody = Json.encodeToString(ExternalAssetRequest(urls = listOf(imageUrl)))
+            Timber.tag(TAG).d("Request body: $requestBody")
+
             val response = client.post(api) {
+                Timber.tag(TAG).d("Authorization: token (len=${token.length})")
                 header("Authorization", token)
                 header("User-Agent", userAgent)
-                if (superPropertiesBase64 != null) header("X-Super-Properties", superPropertiesBase64)
+                if (superPropertiesBase64 != null) {
+                    Timber.tag(TAG).d("Including X-Super-Properties header (len=${superPropertiesBase64.length})")
+                    header("X-Super-Properties", superPropertiesBase64)
+                } else {
+                    Timber.tag(TAG).w("No X-Super-Properties available")
+                }
                 contentType(ContentType.Application.Json)
-                setBody(body)
+                setBody(requestBody)
             }
             val uploadTime = System.currentTimeMillis() - startTime
-            Timber.tag("ExtAssets").d("Upload completed in ${uploadTime}ms, status=${response.status}")
+            Timber.tag(TAG).d("Upload completed in ${uploadTime}ms, status=${response.status.value}")
             val text = response.body<String>()
+            Timber.tag(TAG).d("Response body: ${text.take(200)}")
+
             val json = Json { ignoreUnknownKeys = true }
             val list = json.decodeFromString<List<ExternalAssetResponse>>(text)
+            Timber.tag(TAG).d("Parsed ${list.size} response items")
+
+            if (list.isEmpty()) {
+                Timber.tag(TAG).w("Asset upload returned empty list for ...$imageId, response: $text")
+                return@withContext null
+            }
+
             val result = list.firstOrNull()?.externalAssetPath?.let { "mp:$it" }
             if (result != null) {
-                Timber.tag("ExtAssets").i("Asset uploaded: ...$imageId -> $result")
+                Timber.tag(TAG).i("Asset uploaded successfully: ...$imageId -> $result (took ${uploadTime}ms)")
             } else {
-                Timber.tag("ExtAssets").w("Asset upload returned no path for ...$imageId, response: $text")
+                Timber.tag(TAG).w("Asset upload returned no path for ...$imageId, first item: url=${list.firstOrNull()?.url}, response: $text")
             }
             result
         } catch (e: Exception) {
-            Timber.tag("ExtAssets").e(e, "Asset upload failed for: ...$imageId")
+            Timber.tag(TAG).e(e, "Asset upload failed for: ...$imageId after ${System.currentTimeMillis() - startTime}ms")
             null
         }
     }

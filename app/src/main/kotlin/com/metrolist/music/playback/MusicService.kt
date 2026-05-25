@@ -468,20 +468,28 @@ class MusicService :
             ) {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
+                        Timber.d("[DiscordRPC] SCREEN_OFF: player.isPlaying=${player.isPlaying}")
                         if (!player.isPlaying) {
+                            Timber.d("[DiscordRPC] SCREEN_OFF: player not playing, closing RPC connection")
                             scope.launch(Dispatchers.IO) {
                                 discordRpc?.closeRPC()
                             }
+                        } else {
+                            Timber.d("[DiscordRPC] SCREEN_OFF: player still playing, keeping RPC alive")
                         }
                     }
 
                     Intent.ACTION_SCREEN_ON -> {
+                        Timber.d("[DiscordRPC] SCREEN_ON: player.isPlaying=${player.isPlaying}")
                         if (player.isPlaying) {
+                            Timber.d("[DiscordRPC] SCREEN_ON: player playing, updating RPC")
                             scope.launch {
                                 currentSong.value?.let { song ->
                                     updateDiscordRPC(song)
-                                }
+                                } ?: Timber.d("[DiscordRPC] SCREEN_ON: no current song")
                             }
+                        } else {
+                            Timber.d("[DiscordRPC] SCREEN_ON: player not playing, no update needed")
                         }
                     }
                 }
@@ -681,12 +689,19 @@ class MusicService :
                 }
                 // Update Discord RPC when network becomes available
                 if (isConnected && discordRpc != null && player.isPlaying) {
+                    Timber.d("[DiscordRPC] Network connected: updating RPC for current track")
                     val mediaId = player.currentMetadata?.id
                     if (mediaId != null) {
+                        Timber.d("[DiscordRPC] Fetching song from DB: mediaId=$mediaId")
                         database.song(mediaId).first()?.let { song ->
+                            Timber.d("[DiscordRPC] Network: updating RPC for '${song.song.title}'")
                             updateDiscordRPC(song)
-                        }
+                        } ?: Timber.d("[DiscordRPC] Network: no song found for mediaId=$mediaId")
+                    } else {
+                        Timber.d("[DiscordRPC] Network: no current media ID")
                     }
+                } else {
+                    if (isConnected) Timber.d("[DiscordRPC] Network connected but discordRpc=${discordRpc != null} player.isPlaying=${player.isPlaying}")
                 }
             }
         }
@@ -857,19 +872,31 @@ class MusicService :
             .debounce(300)
             .distinctUntilChanged()
             .collect(scope) { (key, enabled) ->
+                Timber.d("[DiscordRPC] Token/enabled watcher fired: tokenPresent=${key != null} enabled=$enabled discordRpcPresent=${discordRpc != null} discordRpcRunning=${discordRpc?.isRpcRunning()}")
                 if (discordRpc?.isRpcRunning() == true) {
+                    Timber.d("[DiscordRPC] Closing existing RPC connection")
                     discordRpc?.closeRPC()
                 }
                 discordRpc = null
+                Timber.d("[DiscordRPC] discordRpc set to null")
 
                 if (key != null && enabled) {
+                    Timber.d("[DiscordRPC] Creating new DiscordRPC instance (token len=${key.length})")
                     discordRpc = DiscordRPC(key)
+                    Timber.d("[DiscordRPC] Starting DiscordRPC connection...")
                     discordRpc?.start() // Connect immediately to avoid first-play delay
+                    Timber.d("[DiscordRPC] start() returned, isRpcRunning=${discordRpc?.isRpcRunning()}")
                     if (player.playbackState == Player.STATE_READY && player.playWhenReady) {
+                        Timber.d("[DiscordRPC] Player already playing, updating RPC with current song")
                         currentSong.value?.let {
+                            Timber.d("[DiscordRPC] Current song: ${it.song.title}")
                             updateDiscordRPC(it, true)
-                        }
+                        } ?: Timber.d("[DiscordRPC] No current song to update")
+                    } else {
+                        Timber.d("[DiscordRPC] Player not ready/playing (state=${player.playbackState} playWhenReady=${player.playWhenReady}), skipping initial update")
                     }
+                } else {
+                    Timber.d("[DiscordRPC] Not creating DiscordRPC (key=${key != null} enabled=$enabled)")
                 }
             }
 
@@ -889,11 +916,16 @@ class MusicService :
                 )
             }.debounce(300)
             .distinctUntilChanged()
-            .collect(scope) {
-                if (player.playbackState == Player.STATE_READY) {
+            .collect(scope) { prefs ->
+                Timber.d("[DiscordRPC] Discord settings changed: useDetails=${prefs[0]} advanced=${prefs[1]} status=${prefs[2]} type=${prefs[7]} name=${prefs[8]}")
+                Timber.d("[DiscordRPC] Discord buttons: b1Text=${prefs[3]} b1Visible=${prefs[4]} b2Text=${prefs[5]} b2Visible=${prefs[6]}")
+                if (player.playbackState == Player.STATE_READY && discordRpc != null) {
+                    Timber.d("[DiscordRPC] Player ready, updating RPC with current song")
                     currentSong.value?.let { song ->
                         updateDiscordRPC(song, true)
-                    }
+                    } ?: Timber.d("[DiscordRPC] No current song available")
+                } else {
+                    Timber.d("[DiscordRPC] Player not ready (state=${player.playbackState}) or discordRpc=null, skipping update")
                 }
             }
 
@@ -2280,9 +2312,12 @@ class MusicService :
         previousMediaItemIndex = player.currentMediaItemIndex
 
         lastPlaybackSpeed = -1.0f // force update song
+        Timber.d("[DiscordRPC] onMediaItemTransition: mediaItem=${mediaItem?.mediaId} reason=$reason")
+        Timber.d("[DiscordRPC] onMediaItemTransition: reset lastPlaybackSpeed, setting up loudness enhancer")
 
         setupLoudnessEnhancer()
 
+        Timber.d("[DiscordRPC] onMediaItemTransition: cancelling pending discord update job")
         discordUpdateJob?.cancel()
 
         scrobbleManager?.onSongStop()
@@ -2443,6 +2478,7 @@ class MusicService :
                 Player.EVENT_PLAY_WHEN_READY_CHANGED,
             )
         ) {
+            Timber.d("[DiscordRPC] onEvents: isPlaying=${player.isPlaying} state=${player.playbackState}")
             scheduleCrossfade()
             val isBufferingOrReady =
                 player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY
@@ -2473,6 +2509,7 @@ class MusicService :
                     Player.EVENT_MEDIA_ITEM_TRANSITION,
                 )
             ) {
+                Timber.d("[DiscordRPC] Player stopped (no discontinuity/transition), clearing RPC")
                 scope.launch {
                     discordRpc?.close()
                 }
@@ -2485,14 +2522,19 @@ class MusicService :
                 Player.EVENT_IS_PLAYING_CHANGED,
             ) && player.isPlaying
         ) {
+            Timber.d("[DiscordRPC] Media transition or play state change detected, updating RPC")
             val mediaId = player.currentMetadata?.id
             if (mediaId != null) {
+                Timber.d("[DiscordRPC] Fetching song for mediaId=$mediaId")
                 scope.launch {
                     // Fetch song from database to get full info
                     database.song(mediaId).first()?.let { song ->
+                        Timber.d("[DiscordRPC] Song fetched: '${song.song.title}', updating RPC")
                         updateDiscordRPC(song)
-                    }
+                    } ?: Timber.d("[DiscordRPC] No song found for mediaId=$mediaId")
                 }
+            } else {
+                Timber.d("[DiscordRPC] No mediaId in current metadata")
             }
         }
 
@@ -2591,18 +2633,24 @@ class MusicService :
 
     override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
         super.onPlaybackParametersChanged(playbackParameters)
+        Timber.d("[DiscordRPC] onPlaybackParametersChanged: speed=${playbackParameters.speed} lastSpeed=$lastPlaybackSpeed")
         if (playbackParameters.speed != lastPlaybackSpeed) {
             lastPlaybackSpeed = playbackParameters.speed
+            Timber.d("[DiscordRPC] Speed changed to ${playbackParameters.speed}, scheduling RPC update in 1s")
             discordUpdateJob?.cancel()
 
             // update scheduling thingy
             discordUpdateJob =
                 scope.launch {
                     delay(1000)
+                    Timber.d("[DiscordRPC] Speed change delay elapsed: playWhenReady=${player.playWhenReady} state=${player.playbackState}")
                     if (player.playWhenReady && player.playbackState == Player.STATE_READY) {
                         currentSong.value?.let { song ->
+                            Timber.d("[DiscordRPC] Speed change: updating RPC for '${song.song.title}'")
                             updateDiscordRPC(song)
-                        }
+                        } ?: Timber.d("[DiscordRPC] Speed change: no current song")
+                    } else {
+                        Timber.d("[DiscordRPC] Speed change: player not ready, skipping")
                     }
                 }
         }
@@ -3202,8 +3250,14 @@ class MusicService :
         song: Song,
         showFeedback: Boolean = false,
     ) {
+        val startTime = System.currentTimeMillis()
+        Timber.d("[DiscordRPC] updateDiscordRPC: ENTER (song='${song.song.title}', showFeedback=$showFeedback)")
+        Timber.d("[DiscordRPC] updateDiscordRPC: player.isPlaying=${player.isPlaying}, player.playbackState=${player.playbackState}")
+        Timber.d("[DiscordRPC] updateDiscordRPC: discordRpc=${discordRpc != null}, player.currentPosition=${player.currentPosition}")
+
         val useDetails = dataStore.get(DiscordUseDetailsKey, false)
         val advancedMode = dataStore.get(DiscordAdvancedModeKey, false)
+        Timber.d("[DiscordRPC] updateDiscordRPC: useDetails=$useDetails advancedMode=$advancedMode")
 
         val status = if (advancedMode) dataStore.get(DiscordStatusKey, "online") else "online"
         val b1Text = if (advancedMode) dataStore.get(DiscordButton1TextKey, "") else ""
@@ -3212,15 +3266,18 @@ class MusicService :
         val b2Visible = if (advancedMode) dataStore.get(DiscordButton2VisibleKey, true) else true
         val activityType = if (advancedMode) dataStore.get(DiscordActivityTypeKey, "listening") else "listening"
         val activityName = if (advancedMode) dataStore.get(DiscordActivityNameKey, "") else ""
+        Timber.d("[DiscordRPC] updateDiscordRPC: status='$status' b1=[$b1Visible:'$b1Text'] b2=[$b2Visible:'$b2Text'] type='$activityType' name='$activityName'")
 
         val artistThumbnail = song.artists.firstOrNull()?.thumbnailUrl
-        Timber.d("[DiscordRPC] updateDiscordRPC: song=${song.song.title}, artistThumbnail=${artistThumbnail != null}")
+        Timber.d("[DiscordRPC] updateDiscordRPC: song.id=${song.song.id}, artistThumbnail=${artistThumbnail != null}")
+        Timber.d("[DiscordRPC] updateDiscordRPC: speed=${player.playbackParameters.speed}")
 
         discordUpdateJob?.cancel()
+        Timber.d("[DiscordRPC] updateDiscordRPC: previous job cancelled, launching new job")
         discordUpdateJob =
             scope.launch {
-                Timber.d("[DiscordRPC] Starting RPC update...")
-                val startTime = System.currentTimeMillis()
+                Timber.d("[DiscordRPC] updateDiscordRPC job: starting updateSong...")
+                val jobStartTime = System.currentTimeMillis()
                 discordRpc
                     ?.updateSong(
                         song,
@@ -3235,6 +3292,8 @@ class MusicService :
                         activityType,
                         activityName,
                     )?.onFailure {
+                        val elapsed = System.currentTimeMillis() - jobStartTime
+                        Timber.e("[DiscordRPC] updateDiscordRPC job: RPC update FAILED after ${elapsed}ms: ${it.message}")
                         if (showFeedback && it !is CancellationException) {
                             Handler(Looper.getMainLooper()).post {
                                 Toast
@@ -3245,17 +3304,19 @@ class MusicService :
                                     ).show()
                             }
                         }
-                        Timber.e("[DiscordRPC] RPC update failed: ${it.message}")
                     }?.onSuccess {
-                        Timber.d("[DiscordRPC] RPC update completed in ${System.currentTimeMillis() - startTime}ms")
-                    }
+                        val elapsed = System.currentTimeMillis() - jobStartTime
+                        Timber.d("[DiscordRPC] updateDiscordRPC job: RPC update SUCCESS in ${elapsed}ms")
+                    } ?: Timber.w("[DiscordRPC] updateDiscordRPC job: discordRpc is null, cannot update")
             }
         // Fetch missing artist thumbnail independently (not cancelled on song skip)
         scope.launch {
-            Timber.d("[DiscordRPC] Starting artist thumbnail fetch for ${song.artists.firstOrNull()?.name}")
+            val artistName = song.artists.firstOrNull()?.name
+            Timber.d("[DiscordRPC] updateDiscordRPC: launching artist thumbnail fetch for '${artistName}'")
             val fetched = fetchArtistThumbnail(song)
             if (fetched != null) {
-                Timber.d("[DiscordRPC] Artist thumbnail fetched, updating RPC...")
+                Timber.d("[DiscordRPC] updateDiscordRPC: artist thumbnail fetched for '${artistName}', triggering secondary RPC update")
+                val secondaryStart = System.currentTimeMillis()
                 discordRpc?.updateSong(
                     fetched,
                     player.currentPosition,
@@ -3269,11 +3330,12 @@ class MusicService :
                     activityType,
                     activityName,
                 )
-                Timber.d("[DiscordRPC] Artist thumbnail RPC update completed")
+                Timber.d("[DiscordRPC] updateDiscordRPC: secondary RPC update completed in ${System.currentTimeMillis() - secondaryStart}ms")
             } else {
-                Timber.w("[DiscordRPC] Artist thumbnail fetch returned null")
+                Timber.d("[DiscordRPC] updateDiscordRPC: artist thumbnail fetch returned null for '${artistName}'")
             }
         }
+        Timber.d("[DiscordRPC] updateDiscordRPC: EXIT (enqueued, total elapsed ${System.currentTimeMillis() - startTime}ms)")
     }
 
     private suspend fun fetchArtistThumbnail(song: Song): Song? {
@@ -3726,9 +3788,13 @@ class MusicService :
             saveQueueToDisk()
         }
         if (discordRpc?.isRpcRunning() == true) {
+            Timber.d("[DiscordRPC] onDestroy: closing RPC connection")
             discordRpc?.closeRPC()
+        } else {
+            Timber.d("[DiscordRPC] onDestroy: discordRpc not running (present=${discordRpc != null})")
         }
         discordRpc = null
+        Timber.d("[DiscordRPC] onDestroy: discordRpc set to null")
         connectivityObserver.unregister()
         abandonAudioFocus()
         closeAudioEffectSession()
@@ -3742,6 +3808,7 @@ class MusicService :
         // But since we are destroying the service, it's fine.
         player.release()
         discordUpdateJob?.cancel()
+        Timber.d("[DiscordRPC] onDestroy: discordUpdateJob cancelled, cancelling scope")
         scope.cancel()
         super.onDestroy()
     }
