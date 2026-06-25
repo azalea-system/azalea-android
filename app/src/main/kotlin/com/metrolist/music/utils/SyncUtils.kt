@@ -162,13 +162,24 @@ class SyncUtils @Inject constructor(
 
     private fun startProcessingQueue() {
         processingJob = syncScope.launch {
-            for (operation in syncChannel) {
+            while (isActive) {
                 try {
-                    processOperation(operation)
+                    for (operation in syncChannel) {
+                        if (!isActive) break
+                        try {
+                            processOperation(operation)
+                        } catch (e: CancellationException) {
+                            if (!isActive) throw e
+                            Timber.w(e, "CancellationException while processing $operation — continuing")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Error processing sync operation: $operation")
+                        }
+                    }
                 } catch (e: CancellationException) {
-                    throw e
+                    if (!isActive) throw e
+                    Timber.w(e, "CancellationException in processing loop — restarting")
                 } catch (e: Exception) {
-                    Timber.e(e, "Error processing sync operation: $operation")
+                    Timber.e(e, "Fatal error in processing loop — restarting")
                 }
             }
         }
@@ -220,7 +231,12 @@ class SyncUtils @Inject constructor(
             try {
                 return Result.success(block())
             } catch (e: CancellationException) {
-                throw e
+                Timber.w(e, "Attempt ${attempt + 1}/$maxRetries cancelled")
+                if (attempt == maxRetries - 1) {
+                    return Result.failure(e)
+                }
+                delay(currentDelay)
+                currentDelay *= 2
             } catch (e: Exception) {
                 Timber.w(e, "Attempt ${attempt + 1}/$maxRetries failed")
                 if (attempt == maxRetries - 1) {
