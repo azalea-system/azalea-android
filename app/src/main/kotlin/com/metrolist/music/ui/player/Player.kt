@@ -1268,65 +1268,6 @@ fun BottomSheetPlayer(
                     }
 
                     PlayerDesignStyle.MINIMAL -> {
-                        AnimatedContent(targetState = showInlineLyrics, label = "MenuButton") { showLyrics ->
-                            if (showLyrics) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(40.dp)
-                                            .clip(RoundedCornerShape(24.dp))
-                                            .background(textButtonColor.copy(alpha = 0.2f))
-                                            .clickable { isFullScreen = !isFullScreen },
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.fullscreen),
-                                        contentDescription = null,
-                                        tint = textButtonColor,
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.Center)
-                                                .size(24.dp),
-                                    )
-                                }
-                            } else {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(40.dp)
-                                            .clip(RoundedCornerShape(24.dp))
-                                            .background(textButtonColor.copy(alpha = 0.2f))
-                                            .clickable {
-                                                menuState.show {
-                                                    com.metrolist.music.ui.menu.PlayerMenu(
-                                                        mediaMetadata = mediaMetadata,
-                                                        playerBottomSheetState = state,
-                                                        onShowDetailsDialog = {
-                                                            mediaMetadata.id.let {
-                                                                bottomSheetPageState.show {
-                                                                    com.metrolist.music.ui.utils.ShowMediaInfo(it)
-                                                                }
-                                                            }
-                                                        },
-                                                        onDismiss = menuState::dismiss,
-                                                    )
-                                                }
-                                            },
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.more_vert),
-                                        contentDescription = null,
-                                        tint = textButtonColor,
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.Center)
-                                                .size(24.dp),
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.size(12.dp))
-
                         AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                             if (showLyrics) {
                                 val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
@@ -1386,6 +1327,65 @@ fun BottomSheetPlayer(
                                             ),
                                         contentDescription = null,
                                         tint = if (isFavorite) MaterialTheme.colorScheme.error else textButtonColor,
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.Center)
+                                                .size(24.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.size(12.dp))
+
+                        AnimatedContent(targetState = showInlineLyrics, label = "MenuButton") { showLyrics ->
+                            if (showLyrics) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .background(textButtonColor.copy(alpha = 0.2f))
+                                            .clickable { isFullScreen = !isFullScreen },
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.fullscreen),
+                                        contentDescription = null,
+                                        tint = textButtonColor,
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.Center)
+                                                .size(24.dp),
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .background(textButtonColor.copy(alpha = 0.2f))
+                                            .clickable {
+                                                menuState.show {
+                                                    com.metrolist.music.ui.menu.PlayerMenu(
+                                                        mediaMetadata = mediaMetadata,
+                                                        playerBottomSheetState = state,
+                                                        onShowDetailsDialog = {
+                                                            mediaMetadata.id.let {
+                                                                bottomSheetPageState.show {
+                                                                    com.metrolist.music.ui.utils.ShowMediaInfo(it)
+                                                                }
+                                                            }
+                                                        },
+                                                        onDismiss = menuState::dismiss,
+                                                    )
+                                                }
+                                            },
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.more_vert),
+                                        contentDescription = null,
+                                        tint = textButtonColor,
                                         modifier =
                                             Modifier
                                                 .align(Alignment.Center)
