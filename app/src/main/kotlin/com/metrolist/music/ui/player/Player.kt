@@ -1523,7 +1523,7 @@ fun BottomSheetPlayer(
                 }
             }
 
-            Spacer(Modifier.height(if (playerDesignStyle == PlayerDesignStyle.MINIMAL) 8.dp else 24.dp))
+            Spacer(Modifier.height(if (playerDesignStyle == PlayerDesignStyle.MINIMAL) 4.dp else 24.dp))
 
             when (sliderStyle) {
                 SliderStyle.DEFAULT -> {
@@ -1668,7 +1668,7 @@ fun BottomSheetPlayer(
                 )
             }
 
-            Spacer(Modifier.height(if (playerDesignStyle == PlayerDesignStyle.MINIMAL) 8.dp else 24.dp))
+            Spacer(Modifier.height(if (playerDesignStyle == PlayerDesignStyle.MINIMAL) 4.dp else 24.dp))
 
             AnimatedVisibility(
                 visible = !isFullScreen,
@@ -2069,7 +2069,7 @@ fun BottomSheetPlayer(
                                         onClick = playerConnection::seekToNext,
                                     )}
                             }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier

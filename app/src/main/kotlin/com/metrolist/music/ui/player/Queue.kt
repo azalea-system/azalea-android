@@ -458,7 +458,13 @@ fun Queue(
                     ) {
                         ToggleButton(
                             checked = isCasting,
-                            onCheckedChange = { },
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    castHandler?.initialize()
+                                } else {
+                                    castHandler?.disconnect()
+                                }
+                            },
                             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                             modifier = Modifier
                                 .height(56.dp)

@@ -466,9 +466,11 @@ private fun NewMiniPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 // Cast indicator - hidden in MINIMAL design
-                if (isCasting && playerDesignStyle != PlayerDesignStyle.MINIMAL) {
+                if (playerDesignStyle != PlayerDesignStyle.MINIMAL) {
                     Icon(
-                        painter = painterResource(R.drawable.cast_connected),
+                        painter = painterResource(
+                            if (isCasting) R.drawable.cast_connected else R.drawable.cast
+                        ),
                         contentDescription = "Casting",
                         tint = primaryColor,
                         modifier = Modifier.size(20.dp),
