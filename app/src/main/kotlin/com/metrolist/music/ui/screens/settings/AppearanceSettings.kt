@@ -103,7 +103,8 @@ import com.metrolist.music.constants.SwipeThumbnailKey
 import com.metrolist.music.constants.SwipeToRemoveSongKey
 import com.metrolist.music.constants.SwipeToSongKey
 import com.metrolist.music.constants.UseNewMiniPlayerDesignKey
-import com.metrolist.music.constants.UseNewPlayerDesignKey
+import com.metrolist.music.constants.PlayerDesignStyle
+import com.metrolist.music.constants.PlayerDesignStyleKey
 import com.metrolist.music.ui.component.DefaultDialog
 import com.metrolist.music.ui.component.EnumDialog
 import com.metrolist.music.ui.component.IconButton
@@ -162,10 +163,10 @@ fun AppearanceSettings(
     // Check if user has selected a custom color (not the default/dynamic color)
     val isUsingCustomColor = selectedThemeColorInt != DefaultThemeColor.toArgb()
 
-    val (useNewPlayerDesign, onUseNewPlayerDesignChange) =
-        rememberPreference(
-            UseNewPlayerDesignKey,
-            defaultValue = true,
+    val (playerDesignStyle, onPlayerDesignStyleChange) =
+        rememberEnumPreference(
+            PlayerDesignStyleKey,
+            defaultValue = PlayerDesignStyle.EXPRESSIVE,
         )
     val (miniPlayerBackground, onMiniPlayerBackgroundChange) =
         rememberEnumPreference(
@@ -177,6 +178,8 @@ fun AppearanceSettings(
         MiniPlayerBackgroundStyle.entries.filter {
             it != MiniPlayerBackgroundStyle.BLUR || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         }
+
+    var showPlayerDesignDialog by rememberSaveable { mutableStateOf(false) }
 
     var showMiniPlayerBackgroundDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -551,6 +554,26 @@ fun AppearanceSettings(
                     PlayerButtonsStyle.DEFAULT -> stringResource(R.string.default_style)
                     PlayerButtonsStyle.PRIMARY -> stringResource(R.string.primary_color_style)
                     PlayerButtonsStyle.TERTIARY -> stringResource(R.string.tertiary_color_style)
+                }
+            },
+        )
+    }
+
+    if (showPlayerDesignDialog) {
+        EnumDialog(
+            onDismiss = { showPlayerDesignDialog = false },
+            onSelect = {
+                onPlayerDesignStyleChange(it)
+                showPlayerDesignDialog = false
+            },
+            title = stringResource(R.string.player_design_style),
+            current = playerDesignStyle,
+            values = PlayerDesignStyle.entries.toList(),
+            valueText = {
+                when (it) {
+                    PlayerDesignStyle.EXPRESSIVE -> stringResource(R.string.expressive)
+                    PlayerDesignStyle.CLASSIC -> stringResource(R.string.classic)
+                    PlayerDesignStyle.MINIMAL -> stringResource(R.string.minimal)
                 }
             },
         )
@@ -1162,24 +1185,17 @@ fun AppearanceSettings(
                 listOf(
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.palette),
-                        title = { Text(stringResource(R.string.new_player_design)) },
-                        trailingContent = {
-                            Switch(
-                                checked = useNewPlayerDesign,
-                                onCheckedChange = onUseNewPlayerDesignChange,
-                                thumbContent = {
-                                    Icon(
-                                        painter =
-                                            painterResource(
-                                                id = if (useNewPlayerDesign) R.drawable.check else R.drawable.close,
-                                            ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
+                        title = { Text(stringResource(R.string.player_design_style)) },
+                        description = {
+                            Text(
+                                when (playerDesignStyle) {
+                                    PlayerDesignStyle.EXPRESSIVE -> stringResource(R.string.expressive)
+                                    PlayerDesignStyle.CLASSIC -> stringResource(R.string.classic)
+                                    PlayerDesignStyle.MINIMAL -> stringResource(R.string.minimal)
                                 },
                             )
                         },
-                        onClick = { onUseNewPlayerDesignChange(!useNewPlayerDesign) },
+                        onClick = { showPlayerDesignDialog = true },
                     ),
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.gradient),

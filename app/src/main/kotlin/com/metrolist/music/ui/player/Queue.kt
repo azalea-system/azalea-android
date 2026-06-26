@@ -106,7 +106,9 @@ import com.metrolist.music.R
 import com.metrolist.music.constants.ListItemHeight
 import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.constants.QueueEditLockKey
-import com.metrolist.music.constants.UseNewPlayerDesignKey
+import com.metrolist.music.constants.PlayerDesignStyle
+import com.metrolist.music.constants.PlayerDesignStyleKey
+import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.extensions.metadata
 import com.metrolist.music.extensions.move
 import com.metrolist.music.extensions.toggleRepeatMode
@@ -215,10 +217,10 @@ fun Queue(
 
     var locked by rememberPreference(QueueEditLockKey, defaultValue = true)
 
-    val (useNewPlayerDesign, onUseNewPlayerDesignChange) =
-        rememberPreference(
-            UseNewPlayerDesignKey,
-            defaultValue = true,
+    val (playerDesignStyle, onPlayerDesignStyleChange) =
+        rememberEnumPreference(
+            PlayerDesignStyleKey,
+            defaultValue = PlayerDesignStyle.EXPRESSIVE,
         )
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -262,8 +264,8 @@ fun Queue(
             Box(Modifier.fillMaxSize().background(Color.Unspecified))
         },
         collapsedContent = {
-            if (useNewPlayerDesign) {
-                // New design
+            when (playerDesignStyle) {
+                PlayerDesignStyle.EXPRESSIVE, PlayerDesignStyle.MINIMAL -> {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -414,7 +416,8 @@ fun Queue(
                         )
                     }
                 }
-            } else {
+                }
+                PlayerDesignStyle.CLASSIC -> {
                 // Old design
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -535,6 +538,7 @@ fun Queue(
                             )
                         }
                     }
+                }
                 }
             }
 

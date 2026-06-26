@@ -95,6 +95,10 @@
     <string name="player_background_solid">Solid</string>
     <string name="follow_theme">Follow theme</string>
     <string name="gradient">Gradient</string>
+    <string name="player_design_style">Player design style</string>
+    <string name="expressive">Expressive</string>
+    <string name="classic">Classic</string>
+    <string name="minimal">Minimal</string>
     <string name="new_player_design">New player design</string>
     <string name="new_mini_player_design">New mini-player design</string>
     <string name="player_background_blur">Blur</string>

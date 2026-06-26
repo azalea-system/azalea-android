@@ -67,6 +67,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -156,7 +157,8 @@ import com.metrolist.music.constants.SliderStyle
 import com.metrolist.music.constants.SliderStyleKey
 import com.metrolist.music.constants.SquigglySliderKey
 import com.metrolist.music.constants.ThumbnailCornerRadius
-import com.metrolist.music.constants.UseNewPlayerDesignKey
+import com.metrolist.music.constants.PlayerDesignStyle
+import com.metrolist.music.constants.PlayerDesignStyleKey
 import com.metrolist.music.db.entities.LyricsEntity
 import com.metrolist.music.extensions.metadata
 import com.metrolist.music.extensions.togglePlayPause
@@ -216,10 +218,10 @@ fun BottomSheetPlayer(
     val bottomSheetPageState = LocalBottomSheetPageState.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
-    val (useNewPlayerDesign, onUseNewPlayerDesignChange) =
-        rememberPreference(
-            UseNewPlayerDesignKey,
-            defaultValue = true,
+    val (playerDesignStyle, onPlayerDesignStyleChange) =
+        rememberEnumPreference(
+            PlayerDesignStyleKey,
+            defaultValue = PlayerDesignStyle.EXPRESSIVE,
         )
     val (hidePlayerThumbnail, onHidePlayerThumbnailChange) = rememberPreference(HidePlayerThumbnailKey, false)
     val (hideStatusBarOnFullscreen) = rememberPreference(HideStatusBarOnFullscreenKey, false)
@@ -346,6 +348,7 @@ fun BottomSheetPlayer(
     val castPosition by castHandler?.castPosition?.collectAsStateWithLifecycle() ?: remember { mutableLongStateOf(0L) }
     val castDuration by castHandler?.castDuration?.collectAsStateWithLifecycle() ?: remember { mutableLongStateOf(0L) }
     val castIsPlaying by castHandler?.castIsPlaying?.collectAsState() ?: remember { mutableStateOf(false) }
+    val castVolume by castHandler?.castVolume?.collectAsStateWithLifecycle() ?: remember { mutableFloatStateOf(1f) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -1123,7 +1126,7 @@ fun BottomSheetPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                if (useNewPlayerDesign) {
+                if (playerDesignStyle != PlayerDesignStyle.CLASSIC) {
                     val shareShape =
                         RoundedCornerShape(
                             topStart = 50.dp,
@@ -1518,7 +1521,8 @@ fun BottomSheetPlayer(
                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             ) {
                 Column {
-                    if (useNewPlayerDesign) {
+                    when (playerDesignStyle) {
+                        PlayerDesignStyle.EXPRESSIVE -> {
                         Row(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
@@ -1700,7 +1704,8 @@ fun BottomSheetPlayer(
                                 )
                             }
                         }
-                    } else {
+                        }
+                        PlayerDesignStyle.CLASSIC -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier =
@@ -1825,6 +1830,126 @@ fun BottomSheetPlayer(
                                             .padding(4.dp)
                                             .align(Alignment.Center),
                                     onClick = playerConnection::toggleLike,
+                                )
+                            }
+                        }
+                        }
+                        PlayerDesignStyle.MINIMAL -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = PlayerHorizontalPadding),
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    ResizableIconButton(
+                                        icon = R.drawable.skip_previous,
+                                        enabled = canSkipPrevious && !isListenTogetherGuest,
+                                        color = TextBackgroundColor,
+                                        modifier =
+                                            Modifier
+                                                .size(48.dp)
+                                                .align(Alignment.Center)
+                                                .alpha(if (isListenTogetherGuest) 0.5f else 1f),
+                                        onClick = playerConnection::seekToPrevious,
+                                    )}
+                                Spacer(Modifier.width(8.dp))
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(100.dp)
+                                            .clip(RoundedCornerShape(playPauseRoundness))
+                                            .background(textButtonColor)
+                                            .clickable {
+                                                if (isListenTogetherGuest) {
+                                                    playerConnection.toggleMute()
+                                                    return@clickable
+                                                }
+                                                if (isCasting) {
+                                                    if (castIsPlaying) {
+                                                        castHandler?.pause()
+                                                    } else {
+                                                        castHandler?.play()
+                                                    }
+                                                } else if (playbackState == STATE_ENDED) {
+                                                    playerConnection.player.seekTo(0, 0)
+                                                    playerConnection.player.playWhenReady = true
+                                                } else {
+                                                    playerConnection.player.togglePlayPause()
+                                                }
+                                            },
+                                    ) {
+                                        Image(
+                                            painter =
+                                                painterResource(
+                                                    if (isListenTogetherGuest) {
+                                                        if (isMuted) R.drawable.volume_off else R.drawable.volume_up
+                                                    } else if (playbackState == STATE_ENDED) {
+                                                        R.drawable.replay
+                                                    } else if (effectiveIsPlaying) {
+                                                        R.drawable.pause
+                                                    } else {
+                                                        R.drawable.play
+                                                    },
+                                                ),
+                                            contentDescription = null,
+                                            colorFilter = ColorFilter.tint(TextBackgroundColor),
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.Center)
+                                                    .size(72.dp),
+                                        )
+                                    }
+                                Spacer(Modifier.width(8.dp))
+                                Box(modifier = Modifier.weight(1f)) {
+                                    ResizableIconButton(
+                                        icon = R.drawable.skip_next,
+                                        enabled = canSkipNext && !isListenTogetherGuest,
+                                        color = TextBackgroundColor,
+                                        modifier =
+                                            Modifier
+                                                .size(48.dp)
+                                                .align(Alignment.Center)
+                                                .alpha(if (isListenTogetherGuest) 0.5f else 1f),
+                                        onClick = playerConnection::seekToNext,
+                                    )}
+                            }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = PlayerHorizontalPadding),
+                            ) {
+                                val volume = if (isCasting) castVolume else 1f
+                                Icon(
+                                    painter = painterResource(R.drawable.volume_mute),
+                                    contentDescription = null,
+                                    tint = textButtonColor,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Slider(
+                                    value = volume,
+                                    onValueChange = { newVolume ->
+                                        if (isCasting) {
+                                            castHandler?.setVolume(newVolume)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = textButtonColor,
+                                        activeTrackColor = textButtonColor.copy(alpha = 0.7f),
+                                        inactiveTrackColor = textButtonColor.copy(alpha = 0.15f),
+                                    ),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Icon(
+                                    painter = painterResource(R.drawable.volume_up),
+                                    contentDescription = null,
+                                    tint = textButtonColor,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
